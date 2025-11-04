@@ -1,9 +1,11 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using WebApplication1.UseCases;
 
 namespace WebApplication1.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/[controller]")]
     public class WeatherForecastController : ControllerBase
     {
         private static readonly string[] Summaries = new[]
@@ -12,10 +14,12 @@ namespace WebApplication1.Controllers
         };
 
         private readonly ILogger<WeatherForecastController> _logger;
+        private readonly ISender sender;
 
-        public WeatherForecastController(ILogger<WeatherForecastController> logger)
+        public WeatherForecastController(ILogger<WeatherForecastController> logger, ISender sender)
         {
             _logger = logger;
+            this.sender = sender;
         }
 
         [HttpGet(Name = "GetWeatherForecast")]
@@ -28,6 +32,13 @@ namespace WebApplication1.Controllers
                 Summary = Summaries[Random.Shared.Next(Summaries.Length)]
             })
             .ToArray();
+        }
+
+        [HttpPost]
+        public async Task<ActionResult> CreateProduct([FromBody] CreateProduct.Command command)
+        {
+            var id = await sender.Send(command);
+            return Created($"/api/WeatherForecast/{id}", id);
         }
     }
 }

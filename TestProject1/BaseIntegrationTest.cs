@@ -16,13 +16,13 @@ namespace TestProject1
       IDisposable
     {
         private readonly IServiceScope _scope;
-        protected readonly ISender sender;
         protected readonly ApplicationDbContext dbContext;
+        protected readonly HttpClient httpClient;
 
         protected BaseIntegrationTest(IntegrationTestWebAppFactory factory)
         {
             _scope = factory.Services.CreateScope();
-            sender = _scope.ServiceProvider.GetRequiredService<ISender>();
+            httpClient = factory.CreateClient();
             dbContext = _scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             dbContext.Database.EnsureDeleted();
@@ -31,7 +31,7 @@ namespace TestProject1
 
         public void Dispose()
         {
-            _scope?.Dispose();
+            httpClient.Dispose();
             dbContext?.Dispose();
         }
     }
