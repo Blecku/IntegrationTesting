@@ -6,9 +6,9 @@ using System.Text.Json;
 
 namespace TestProject1.Tests
 {
-    public class ProductTest : BaseIntegrationTest
+    public class ProductTest2_36 : BaseIntegrationTest
     {
-        public ProductTest(IntegrationTestWebAppFactory factory)
+        public ProductTest2_36(IntegrationTestWebAppFactory factory)
             : base(factory)
         {
         }
@@ -70,3 +70,4 @@ namespace TestProject1.Tests
         }
     }
 }
+

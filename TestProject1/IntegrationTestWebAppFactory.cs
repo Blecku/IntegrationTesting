@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Data.Common;
 using Testcontainers.MsSql;
 using WebApplication1.Database;
 
@@ -12,10 +11,12 @@ namespace TestProject1
 {
     public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
-        private readonly MsSqlContainer _dbContainer = new MsSqlBuilder()
-        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-        .WithPassword("Strong_password_123!")
-        .Build();
+
+        //private SqlConnectionStringBuilder builder;
+
+        protected string DatabaseName { get; private set; }
+
+        private MsSqlContainer _container;
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -32,24 +33,55 @@ namespace TestProject1
                     services.Remove(descriptor);
                 }
 
-                var csb = new SqlConnectionStringBuilder(_dbContainer.GetConnectionString())
+                var builder = new SqlConnectionStringBuilder(_container.GetConnectionString())
                 {
-                    InitialCatalog = $"TestDb-{Guid.NewGuid()}",
+                    InitialCatalog = DatabaseName
                 };
-
                 services.AddDbContext<ApplicationDbContext>(options =>
-                    options.UseSqlServer(csb.ConnectionString));
+                    options.UseSqlServer(builder.ToString()));
             });
         }
 
-        public Task InitializeAsync()
+        public async Task InitializeAsync()
         {
-            return _dbContainer.StartAsync();
+            // Pobierz współdzielony kontener
+            _container = await SharedMsSqlContainer.GetContainerAsync();
+
+            // Utwórz unikalną nazwę bazy danych dla tej klasy testów
+            DatabaseName = $"TestDb_{GetType().Name}_{Guid.NewGuid():N}";
+
+            // Utwórz nową bazę danych
+            await CreateDatabaseAsync();
+
         }
 
-        public new Task DisposeAsync()
+        public new async Task DisposeAsync()
         {
-            return _dbContainer.StopAsync();
+            await DropDatabaseAsync();
+        }
+
+        private async Task CreateDatabaseAsync()
+        {
+            var cs = SharedMsSqlContainer.GetConnectionString();
+            using var connection = new SqlConnection(cs);
+            await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = $"CREATE DATABASE [{DatabaseName}]";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        private async Task DropDatabaseAsync()
+        {
+            using var connection = new SqlConnection(SharedMsSqlContainer.GetConnectionString());
+            await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            // Najpierw rozłącz wszystkie połączenia
+            command.CommandText = $@"
+            ALTER DATABASE [{DatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+            DROP DATABASE [{DatabaseName}];";
+            await command.ExecuteNonQueryAsync();
         }
     }
 }
